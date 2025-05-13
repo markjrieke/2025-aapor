@@ -1,3 +1,4 @@
 # 2025-aapor
 
-code and materials for my presentation at aapor's 80th annual conference
+Code and replication materials for my presentation at [AAPOR's 80th annual conference](https://aapor.org/aapor-80th-annual-conference/). The slides are hosted on [github pages](https://markjrieke.github.io/2025-aapor/).
+
