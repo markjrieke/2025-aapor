@@ -8,9 +8,8 @@ library(ggdist)
 library(ggblend)
 
 # plot colors
-dd_green <- "#5A9282"
-dd_oppo <- "#c0aa72"
-  
+pal <- c("#838cf1", "#f1838c")
+
 # true conditions --------------------------------------------------------------
 
 # group-level probability of support, population proportion, and probability of response
@@ -23,7 +22,7 @@ groups <-
          p_respond = c(0.05, 0.05, 0.05, 0.05),
          p_sampled = population * p_respond,
          p_sampled = p_sampled/sum(p_sampled))
-  
+
 # pollster bias, frequency of surveying, and target sample size
 set.seed(123)
 pollsters <-
@@ -38,33 +37,33 @@ pollsters <-
 # util stan "model" for estimating the weighted mean/sd
 wtmean <-
   cmdstan_model(
-    "posts/2024-11-01-aapor/stan/wtmean.stan",
-    dir = "posts/2024-11-01-aapor/exe/"
+    "stan/wtmean.stan",
+    dir = "exe/"
   )
 
 # poll aggregation model with a binomial likelihood
 binomial_model <-
   cmdstan_model(
-    "posts/2024-11-01-aapor/stan/binomial.stan",
-    dir = "posts/2024-11-01-aapor/exe/"
+    "stan/binomial.stan",
+    dir = "exe/"
   )
 
 # poll aggregation model with a beta likelihood (mean-variance parameterization)
 beta_model <-
   cmdstan_model(
-    "posts/2024-11-01-aapor/stan/beta.stan",
-    dir = "posts/2024-11-01-aapor/exe/"
+    "stan/beta.stan",
+    dir = "exe/"
   )
 
 # poll aggregation model with a normal likelihood
 normal_model <-
   cmdstan_model(
-    "posts/2024-11-01-aapor/stan/normal.stan",
-    dir = "posts/2024-11-01-aapor/exe/"
+    "stan/normal.stan",
+    dir = "exe/"
   )
 
 # simulation functions ---------------------------------------------------------
-  
+
 # simulate whether (or not) each pollster conducts a survey on any given day
 simulate_survey <- function() {
   
@@ -186,7 +185,7 @@ plot_voteshare <- function(model, cred_level = 0.95) {
                ymin = .lower,
                ymax = .upper)) + 
     geom_ribbon(alpha = 0.4,
-                fill = dd_green) +
+                fill = pal[1]) +
     geom_point(data = polls,
                mapping = aes(x = day,
                              y = mean,
@@ -194,16 +193,16 @@ plot_voteshare <- function(model, cred_level = 0.95) {
                              ymin = NULL,
                              ymax = NULL),
                shape = 21,
-               color = dd_green,
+               color = pal[1],
                alpha = 0.5) + 
-    geom_line(color = dd_green,
+    geom_line(color = pal[1],
               linewidth = 0.8) %>% copy_under(color = "white", linewidth = 1.6) + 
     scale_y_percent() + 
     theme_rieke() + 
     theme(legend.position = "none") + 
     labs(title = "**A Summary of Simulated Sentiment**",
          subtitle = glue::glue("Two-party candidate voteshare as modeled by a ",
-                               "**{color_text(likelihood, dd_green)}** likelihood"),
+                               "**{color_text(likelihood, pal[1])}** likelihood"),
          x = "Day of campaign",
          y = NULL,
          caption = glue::glue("Shaded region indicates {scales::label_percent(accuracy = 1)(cred_level)} ",
@@ -249,18 +248,18 @@ plot_parameters <- function(model) {
                y = beta,
                ymin = .lower,
                ymax = .upper)) +
-    geom_pointinterval(color = dd_green) + 
+    geom_pointinterval(color = pal[1]) + 
     geom_point(aes(y = bias),
-               color = dd_oppo,
+               color = pal[2],
                size = 3,
                alpha = 0.75) +
     facet_wrap(~strategy, scales = "free_y") + 
     coord_flip() + 
     theme_rieke() +
     labs(title = "**Poll-model Parameters**",
-         subtitle = glue::glue("**{color_text('Parameter estimates', dd_green)}** and ",
-                               "**{color_text('simulated values', dd_oppo)}** of pollster bias as modeled by a ",
-                               "**{color_text(likelihood, dd_green)}** likelihood"),
+         subtitle = glue::glue("**{color_text('Parameter estimates', pal[1])}** and ",
+                               "**{color_text('simulated values', pal[2])}** of pollster bias as modeled by a ",
+                               "**{color_text(likelihood, pal[1])}** likelihood"),
          x = NULL,
          y = "\u03b2<sub>p</sub> (logit scale)",
          caption = glue::glue("Pointrange indicates 66/95% posterior credible",
@@ -339,7 +338,10 @@ binomial_fit <-
 
 # plots
 binomial_fit %>% plot_voteshare()
+ggquicksave("img/binomial_voteshare.png")
+
 binomial_fit %>% plot_parameters()
+ggquicksave("img/binomial_parameters.png")
 
 # beta model -------------------------------------------------------------------
 
@@ -383,7 +385,10 @@ beta_fit <-
   )
 
 beta_fit %>% plot_voteshare()
+ggquicksave("img/beta_voteshare.png")
+
 beta_fit %>% plot_parameters()
+ggquicksave("img/beta_parameters.png")
 
 # normal model -----------------------------------------------------------------
 
@@ -419,4 +424,7 @@ normal_fit <-
   )
 
 normal_fit %>% plot_voteshare()
+ggquicksave("img/normal_voteshare.png")
+
 normal_fit %>% plot_parameters()
+ggquicksave("img/normal_parameters.png")

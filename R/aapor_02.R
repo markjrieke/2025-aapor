@@ -6,6 +6,8 @@ library(ggdist)
 library(ggblend)
 library(riekelib)
 
+pal <- c("#838cf1", "#f1838c", "#5a9282")
+
 # true underlying population/group characteristics
 groups <-
   tibble(group = LETTERS[1:2],
@@ -72,8 +74,8 @@ crossing(poll = 1:n_sims,
   geom_hline(yintercept = true_mean,
              linetype = "dotted",
              color = "gray40") +
-  scale_color_brewer(palette = "Set2") + 
-  scale_fill_brewer(palette = "Set2") + 
+  scale_color_manual(values = rev(pal[1:2])) + 
+  scale_fill_manual(values = rev(pal[1:2])) + 
   scale_y_percent() +
   coord_flip() + 
   theme_rieke() + 
@@ -88,6 +90,7 @@ crossing(poll = 1:n_sims,
                        "Dashed line indicates simulated true population mean",
                        sep = "<br>"))
 
+ggquicksave("img/binary.png")
 
 
 

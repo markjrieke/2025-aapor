@@ -4,6 +4,8 @@ library(ggdist)
 library(ggblend)
 library(riekelib)
 
+pal <- c("#838cf1", "#f1838c", "#5a9282")
+
 # true underlying population/group characteristics
 groups <-
   tibble(group = LETTERS[1:2],
@@ -19,8 +21,8 @@ sims <-
   
   # simulate different levels of subgroup correlation with the outcome
   crossing(sim = 1:n_sims,
-         beta = seq(from = 0.03, to = 0.97, by = 0.01),
-         groups) %>%
+           beta = seq(from = 0.03, to = 0.97, by = 0.01),
+           groups) %>%
   
   # simulate different levels of subgroup correlation with nonresponse
   nest(data = -c(sim, group, population)) %>%
@@ -58,7 +60,7 @@ sims <-
   summarise(mean = mean(p),
             sd = sd(p)) %>%
   ungroup()
-  
+
 # plot! ------------------------------------------------------------------------
 
 sims %>%
@@ -71,15 +73,15 @@ sims %>%
              y = sd,
              color = method)) + 
   geom_point() +
-  scale_color_brewer(palette = "Set2") +
+  scale_color_manual(values = rev(pal[1:2])) + 
   facet_wrap(~case, scales = "free_y") + 
   theme_rieke() +
   theme(legend.position = "none") + 
   labs(title = "**Effect of weighting on SE of the mean**",
        subtitle = glue::glue("In binary outcomes, **",
-                             color_text("weighting", RColorBrewer::brewer.pal(6, "Set2")[2]),
+                             color_text("weighting", pal[1]),
                              "** can reduce the SE relative to the **",
-                             color_text("unweighted", RColorBrewer::brewer.pal(6, "Set2")[1]),
+                             color_text("unweighted", pal[2]),
                              "** mean,<br>",
                              "depending on the relative proportion of nonresponse among subgroups"),
        x = "Subgroup A probability of support",
@@ -88,5 +90,6 @@ sims %>%
                        "for each level of support among subgroup A",
                        sep = "<br>"))
 
+ggquicksave("img/varying_binary.png")
 
 
