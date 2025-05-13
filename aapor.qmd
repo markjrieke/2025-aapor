@@ -1,0 +1,287 @@
+---
+title: <span style='color:#838cf1'>Weighting and Its Consequences<span>
+subtitle: Variance Reduction in Discrete Outcomes and Its Implications for Survey Aggregation
+author: Mark Rieke
+date: 2025-05-15
+date-format: long
+format: 
+  revealjs:
+    embed-resources: true
+    theme: [simple, styles.scss]
+    html-math-method: mathjax
+execute: 
+  echo: false
+  message: false
+  warning: false
+---
+
+```{r}
+library(tidyverse)
+library(riekelib)
+library(tinytable)
+
+pal <- c("#838cf1", "#f1838c", "#5a9282")
+```
+
+## Disclaimer
+
+The views and opinions expressed in this presentation are wholly my own and do not necessarily represent that of my employer, Game Data Pros, Inc (GDP).
+
+## Outline
+
+* Setting the Stage
+* Recreating Results
+* Extending the Example
+* Adjustments for Aggregators
+
+# Setting the Stage
+
+## Setting the Stage: `r color_text("About Me", pal[1])`
+
+* Bayesian Data Scientist at [Game Data Pros](https://gamedatapros.com/)
+* Previously: Senior CX Analyst at [Memorial Hermann](https://memorialhermann.org/)
+
+## Setting the Stage: `r color_text("About Me", pal[1])`
+
+![](img/potus.png)
+
+## Setting the Stage: `r color_text("Pennsylvania Polling", pal[1])`
+
+```{r}
+tibble(date = mdy(c(rep("9/24/24", 2), rep("9/23/24", 2), "9/22/24", rep("9/20/24", 2), rep("9/19/24", 3))),
+       sample_size = c(760, 582, 601, 384, 644, 768, 760, 1020, 432, 752),
+       margin = c(0, 3.1, 2.2, 0, 0, 0, -1.1, 0, 0, 2.1)) %>%
+  mutate(date = scales::label_date(format = "%B %d")(date),
+         sample_size = scales::label_comma()(sample_size),
+         margin = case_when(margin > 0 ~ color_text(paste0("+", margin, "%"), pal[1]),
+                            margin < 0 ~ color_text(paste0("+", abs(margin), "%"), pal[2]),
+                            .default = color_text("-", "gray40"))) %>%
+  tt(width = 0.8, theme = "striped") %>%
+  style_tt(fontsize = 0.6) %>%
+  style_tt(i = 1:9,
+           line = "",
+           line_width = 0)
+```
+
+## Setting the Stage: `r color_text("Pennsylvania Polling", pal[1])`
+
+![](img/raphael_tweet.png)
+
+# Recreating Results
+
+## Recreating Results
+
+![](img/little-vartivarian-table.png)
+
+## Recreating Results
+
+```{r}
+groups <-
+  tibble(group = LETTERS[1:4],
+         group_mean = c(400, 800, 700, 600),
+         population = c(0.6, 0.2, 0.1, 0.1),
+         p_respond = c(0.1, 0.05, 0.03, 0.01))
+
+groups %>%
+  mutate(across(c(population, p_respond), ~scales::label_percent(accuracy = 1)(.x))) %>%
+  knitr::kable()
+```
+
+* True population mean: **`r sum(groups$group_mean * groups$population)`**
+* Responses sampled from $\mathcal{N}(\mu_g,50)$
+* Simple population weighting strategy: $w_g = \frac{P_g}{\left(\frac{N_g}{\sum_g N_g} \right)}$
+
+## Recreating Results
+
+![](img/continuous.png)
+
+# Extending the Example
+
+## Extending the Example
+
+* Little and Vartivarian demonstrate the effect of weighting with a **`r color_text("continuous outcome", pal[1])`**.
+* A broad class of survey results are **`r color_text("discrete outcomes", pal[1])`**.
+* How do these effects hold up in the discrete case?
+
+## Extending the Example
+
+```{r}
+groups <-
+  tibble(group = LETTERS[1:2],
+         group_mean = c(0.03, 0.97),
+         population = c(0.5, 0.5),
+         p_respond = c(0.05, 0.07))
+
+groups %>%
+  mutate(across(-group, ~scales::label_percent(accuracy = 1)(.x))) %>%
+  knitr::kable()
+```
+
+* True population mean: **`r scales::label_percent(accuracy = 1)(sum(groups$group_mean * groups$population))`**
+* Responses sampled from $\text{Bernoulli}(\theta_g)$
+* Simple population weighting strategy: $w_g = \frac{P_g}{\left(\frac{N_g}{\sum_g N_g} \right)}$
+
+## Extending the Example
+
+![](img/binary.png)
+
+## Extending the Example
+
+* We don't observe the same effects for cases 1 and 2.
+* I drastically increased the correlation with the outcome to see an effect in cases 3 and 4.
+* New simulation --- How much correlation with the outcome is needed to see a benefit in variance reduction?
+  * Vary correlation with nonresponse/outcome
+  * Record simulated standard error
+
+## Extending the Example
+
+![](img/varying_binary.png)
+
+## Extending the Example
+
+* Any amount of correlation with the outcome decreases the variance when uncorrelated with nonresponse.
+* As correlation with nonresponse increases, so too must correlation with the outcome in order to see a reduction in variance.
+
+# Adjustments for Aggregators
+
+## Adjustments for Aggregators
+
+* Effect for poll aggregation models
+  * Reasonable models with discrete likelihoods can overstate the variance in model parameters.
+  * Modeling the variance per-poll directly improves the precision of parameter estimates.
+* Let's demonstrate this by simulating a campaign!
+
+## Adjustments for Aggregators
+
+```{r}
+groups <-
+  crossing(strata_1 = LETTERS[1:2],
+           strata_2 = 1:2) %>%
+  mutate(group = paste0(strata_1, strata_2),
+         group_mean = c(0.97, 0.90, 0.10, 0.03),
+         population = c(0.25, 0.25, 0.25, 0.25),
+         p_respond = c(0.05, 0.05, 0.05, 0.05))
+
+groups %>%
+  mutate(across(c(group_mean, population, p_respond),
+                ~scales::label_percent(accuracy = 1)(.x))) %>%
+  knitr::kable()
+```
+
+* True population mean: **`r scales::label_percent(accuracy = 1)(sum(groups$group_mean * groups$population))`**
+* Responses sampled from $\text{Bernoulli}(\theta_g)$
+* Simple population weighting strategy: $w_g = \frac{P_g}{\left(\frac{N_g}{\sum_g N_g} \right)}$
+
+## Adjustments for Aggregators
+
+```{r}
+set.seed(123)
+pollsters <-
+  tibble(pollster = paste("Pollster", 1:20),
+         strategy = c(rep("cross", 10), rep("single", 10))) %>%
+  bind_cols(bias = rnorm(nrow(.), 0, 0.05))
+
+bind_rows(slice_head(pollsters, n = 3),
+          slice_tail(pollsters, n = 3)) %>%
+  mutate(bias = round(bias, digits = 3)) %>%
+  knitr::kable()
+```
+
+* Simulated pollsters have (logit-scale) statistical bias
+
+## Adjustments for Aggregators
+
+* "Cross" strategy: weight on all variables
+* "Single" strategy: weight on `strata_2` only
+
+```{r}
+groups %>%
+  group_by(strata_2) %>%
+  summarise(strata_mean = mean(group_mean)) %>%
+  mutate(strata_mean = scales::label_percent(accuracy = 0.1)(strata_mean)) %>% 
+  knitr::kable()
+```
+
+## Adjustments for Aggregators
+
+```{r}
+polls <-
+  read_rds("https://github.com/markjrieke/thedatadiary.net/raw/refs/heads/main/posts/2025-05-08-aapor-04/data/polls.rds")
+
+polls %>%
+  slice_head(n = 6) %>%
+  transmute(day = day,
+            pollster = pollster,
+            sample_size = map_int(data, ~sum(.x$K)),
+            mean = mean,
+            err = pmap_dbl(list(mean, sd), ~qnorm(0.975, ..1, ..2) - ..1)) %>%
+  mutate(across(c(mean, err), ~scales::label_percent(accuracy = 0.1)(.x)),
+         err = paste0("+/-", err)) %>%
+  knitr::kable()
+```
+
+## Adjustments for Aggregators
+
+$$
+\begin{align*}
+\text{Y}_{d,p} &\sim \text{Binomial}(\text{K}_{d,p}, \theta_{d,p}) \\
+\text{logit}(\theta_{d,p}) &= \alpha + \beta_d + \beta_p \\
+\beta_p &= \eta_p \sigma_\beta
+\end{align*}
+$$
+
+* Estimated true support: $\text{logit}(\theta_d) = \alpha + \beta_d$
+* Bias parameters: $\beta_p$
+
+## Adjustments for Aggregators
+
+![](img/binomial_voteshare.png)
+
+## Adjustments for Aggregators
+
+![](img/binomial_parameters.png)
+
+## Adjustments for Aggregators
+
+* How can we improve?
+
+$$
+\text{Y}_{d,p} \sim \text{Normal}(\theta_{d,p}, \sigma_{d,p})
+$$
+
+* Latent model for $\text{logit}(\theta_{d,p})$ remains the same
+* Interpretation of $\beta_p$ remains the same
+
+## Adjustments for Aggregators
+
+![](img/normal_voteshare.png)
+
+## Adjustments for Aggregators
+
+![](img/normal_parameters.png)
+
+## Adjustments for Aggregators
+
+![](img/binomial_parameters.png)
+
+## In Summary
+
+* **`r color_text("Weighting can reduce both bias and variance", pal[1])`** when the weighting variables are highly correlated with nonresponse and the outcome.
+* The threshold for "highly correlated" with the outcome **`r color_text("increases", pal[1])`** as the correlation with nonresponse increases.
+* This is particularly prescient in **`r color_text("discrete outcomes", pal[1])`**.
+* Aggregators can improve the precision of parameter estimates by **`r color_text("modeling the variance of each poll directly", pal[1])`**.
+
+## Reading Material
+
+* [Does Weighting for Nonresponse Increase the Variance of Survey Means?](https://www150.statcan.gc.ca/n1/en/pub/12-001-x/2005002/article/9046-eng.pdf?st=V8cCWCpp) Little and Vartivarian, 2005.
+* [Dynamic Bayesian Forecasting of Presidential Elections in the States](https://votamatic.org/wp-content/uploads/2013/07/Linzer-JASA13.pdf). Linzer, 2013.
+* Weighting and Its Consequences ([Part 1](https://www.thedatadiary.net/posts/2025-05-08-aapor-01/), [Part 2](https://www.thedatadiary.net/posts/2025-05-08-aapor-02/), [Part 3](https://www.thedatadiary.net/posts/2025-05-08-aapor-03/), [Part 4](https://www.thedatadiary.net/posts/2025-05-08-aapor-04/)).
+
+## Stay in Touch
+
+* **[{{< iconify simple-icons bluesky >}} @markjrieke.bsky.social](https://bsky.app/profile/markjrieke.bsky.social)**
+* **[{{< iconify simple-icons linkedin >}} linkedin.com/in/markjrieke](https://www.linkedin.com/in/markjrieke/)**
+* **[{{< iconify simple-icons github >}} github.com/markjrieke](https://github.com/markjrieke)**
+* **[{{< iconify simple-line-icons link >}} thedatadiary.net](https://www.thedatadiary.net/)**
+
+
